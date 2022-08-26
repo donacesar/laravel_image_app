@@ -5,7 +5,7 @@
             upload
         </div>
         <div class="mb-3">
-            <vue-editor v-model="content" />
+            <vue-editor useCustomImageHandler @image-added="handleImageAdded" v-model="content"/>
         </div>
         <input @click.prevent="store" type="submit" class="mb-3 btn btn-primary" value="add">
 
@@ -14,8 +14,9 @@
                 <h4>{{ post.title }}</h4>
                 <div v-for="image in post.images">
                     <img :src="image.preview_url" class="mb-3">
-                    <img :src="image.url">
+                    <img :src="image.url" class="mb-3">
                 </div>
+                <div v-html="post.content" class="ql-editor"></div>
             </div>
         </div>
     </div>
@@ -23,7 +24,8 @@
 
 <script>
 import Dropzone from 'dropzone'
-import { VueEditor } from"vue2-editor"
+import {VueEditor} from "vue2-editor"
+
 export default {
     name: "Index",
 
@@ -36,7 +38,7 @@ export default {
         }
     },
     components: {
-      VueEditor
+        VueEditor
     },
     mounted() {
         this.dropzone = new Dropzone(this.$refs.dropzone, {
@@ -56,23 +58,44 @@ export default {
 
             })
             data.append('title', this.title)
+            data.append('content', this.content)
             axios.post('/api/posts', data)
-            .then(res => {
-                this.getPost()
-            })
-            this.title = ''
+                .then(res => {
+                    this.getPost()
+                })
+            this.title = '',
+            this.content = ''
         },
         getPost() {
             axios.get('/api/posts')
                 .then(res => {
                     this.post = res.data.data
                 })
+        },
+        handleImageAdded(file, Editor, cursorLocation, resetUploader) {
+            const formData = new FormData();
+            formData.append("image", file);
+
+            axios.post('/api/posts/images', formData)
+                .then(result => {
+                    const url = result.data.url; // Get url from response
+                    Editor.insertEmbed(cursorLocation, "image", url);
+                    resetUploader();
+                })
+                .catch(err => {
+                    console.log(err);
+                });
         }
     }
 
 }
 </script>
 
-<style scoped>
+<style>
+.dz-success-mark,
+.dz-error-mark{
+    display: none;
+}
+
 
 </style>
