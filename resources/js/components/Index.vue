@@ -5,9 +5,9 @@
             upload
         </div>
         <div class="mb-3">
-            <vue-editor useCustomImageHandler @image-added="handleImageAdded" v-model="content"/>
+            <vue-editor useCustomImageHandler @image-removed="handleImageRemoved" @image-added="handleImageAdded" v-model="content"/>
         </div>
-        <input @click.prevent="store" type="submit" class="mb-3 btn btn-primary" value="add">
+        <input @click.prevent="update" type="submit" class="mb-3 btn btn-primary" value="Update">
 
         <div class="mt-5">
             <div v-if="post">
@@ -34,7 +34,9 @@ export default {
             dropzone: null,
             title: '',
             post: [],
-            content: null
+            content: null,
+            imageIdsForDelete: [],
+            imageUrlsForDelete: []
         }
     },
     components: {
@@ -46,10 +48,15 @@ export default {
             autoProcessQueue: false,
             addRemoveLinks: true,
         })
+
+        this.dropzone.on('removedfile', (file) => {
+            this.imageIdsForDelete.push(file.id)
+        })
+
         this.getPost()
     },
     methods: {
-        store() {
+        update() {
             const data = new FormData()
             const files = this.dropzone.getAcceptedFiles()
             files.forEach(file => {
@@ -57,19 +64,44 @@ export default {
                 this.dropzone.removeFile(file)
 
             })
+
+            this.imageIdsForDelete.forEach(idForDelete => {
+                data.append('image_ids_for_delete[]', idForDelete)
+            })
+            this.imageUrlsForDelete.forEach(urlForDelete => {
+                data.append('image_urls_for_delete[]', urlForDelete)
+            })
+
             data.append('title', this.title)
             data.append('content', this.content)
-            axios.post('/api/posts', data)
+            data.append('_method', 'PATCH')
+            axios.post(`/api/posts/${this.post.id}`, data)
                 .then(res => {
+                    let previews = this.dropzone.previewsContainer.querySelectorAll('.dz-image-preview')
+                    previews.forEach( preview => {
+                        preview.remove();
+                    })
+
+
                     this.getPost()
                 })
             this.title = '',
-            this.content = ''
+                this.content = ''
         },
         getPost() {
             axios.get('/api/posts')
                 .then(res => {
                     this.post = res.data.data
+
+                    this.title = this.post.title
+                    this.content = this.post.content
+
+                    this.post.images.forEach(image => {
+
+                        let file = {id: image.id, name: image.name, size: image.size};
+                        this.dropzone.displayExistingFile(file, image.preview_url);
+                    })
+
                 })
         },
         handleImageAdded(file, Editor, cursorLocation, resetUploader) {
@@ -85,6 +117,9 @@ export default {
                 .catch(err => {
                     console.log(err);
                 });
+        },
+        handleImageRemoved(url) {
+            this.imageUrlsForDelete.push(url)
         }
     }
 
@@ -93,7 +128,7 @@ export default {
 
 <style>
 .dz-success-mark,
-.dz-error-mark{
+.dz-error-mark {
     display: none;
 }
 

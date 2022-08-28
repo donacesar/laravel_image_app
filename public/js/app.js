@@ -5348,43 +5348,75 @@ __webpack_require__.r(__webpack_exports__);
       dropzone: null,
       title: '',
       post: [],
-      content: null
+      content: null,
+      imageIdsForDelete: [],
+      imageUrlsForDelete: []
     };
   },
   components: {
     VueEditor: vue2_editor__WEBPACK_IMPORTED_MODULE_1__.VueEditor
   },
   mounted: function mounted() {
+    var _this = this;
+
     this.dropzone = new dropzone__WEBPACK_IMPORTED_MODULE_0__["default"](this.$refs.dropzone, {
       url: "/api/posts",
       autoProcessQueue: false,
       addRemoveLinks: true
     });
+    this.dropzone.on('removedfile', function (file) {
+      _this.imageIdsForDelete.push(file.id);
+    });
     this.getPost();
   },
   methods: {
-    store: function store() {
-      var _this = this;
+    update: function update() {
+      var _this2 = this;
 
       var data = new FormData();
       var files = this.dropzone.getAcceptedFiles();
       files.forEach(function (file) {
         data.append('images[]', file);
 
-        _this.dropzone.removeFile(file);
+        _this2.dropzone.removeFile(file);
+      });
+      this.imageIdsForDelete.forEach(function (idForDelete) {
+        data.append('image_ids_for_delete[]', idForDelete);
+      });
+      this.imageUrlsForDelete.forEach(function (urlForDelete) {
+        data.append('image_urls_for_delete[]', urlForDelete);
       });
       data.append('title', this.title);
       data.append('content', this.content);
-      axios.post('/api/posts', data).then(function (res) {
-        _this.getPost();
+      data.append('_method', 'PATCH');
+      axios.post("/api/posts/".concat(this.post.id), data).then(function (res) {
+        var previews = _this2.dropzone.previewsContainer.querySelectorAll('.dz-image-preview');
+
+        previews.forEach(function (preview) {
+          preview.remove();
+        });
+
+        _this2.getPost();
       });
       this.title = '', this.content = '';
     },
     getPost: function getPost() {
-      var _this2 = this;
+      var _this3 = this;
 
       axios.get('/api/posts').then(function (res) {
-        _this2.post = res.data.data;
+        _this3.post = res.data.data;
+        _this3.title = _this3.post.title;
+        _this3.content = _this3.post.content;
+
+        _this3.post.images.forEach(function (image) {
+          var file = {
+            id: image.id,
+            name: image.name,
+            size: image.size
+          };
+
+          _this3.dropzone.displayExistingFile(file, image.preview_url);
+        });
       });
     },
     handleImageAdded: function handleImageAdded(file, Editor, cursorLocation, resetUploader) {
@@ -5398,6 +5430,9 @@ __webpack_require__.r(__webpack_exports__);
       })["catch"](function (err) {
         console.log(err);
       });
+    },
+    handleImageRemoved: function handleImageRemoved(url) {
+      this.imageUrlsForDelete.push(url);
     }
   }
 });
@@ -12674,7 +12709,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_0___default()(function(i){return i[1]});
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, "\n.dz-success-mark,\n.dz-error-mark{\n    display: none;\n}\n\n\n", ""]);
+___CSS_LOADER_EXPORT___.push([module.id, "\n.dz-success-mark,\n.dz-error-mark {\n    display: none;\n}\n\n\n", ""]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -42392,7 +42427,10 @@ var render = function () {
       [
         _c("vue-editor", {
           attrs: { useCustomImageHandler: "" },
-          on: { "image-added": _vm.handleImageAdded },
+          on: {
+            "image-removed": _vm.handleImageRemoved,
+            "image-added": _vm.handleImageAdded,
+          },
           model: {
             value: _vm.content,
             callback: function ($$v) {
@@ -42407,11 +42445,11 @@ var render = function () {
     _vm._v(" "),
     _c("input", {
       staticClass: "mb-3 btn btn-primary",
-      attrs: { type: "submit", value: "add" },
+      attrs: { type: "submit", value: "Update" },
       on: {
         click: function ($event) {
           $event.preventDefault()
-          return _vm.store.apply(null, arguments)
+          return _vm.update.apply(null, arguments)
         },
       },
     }),
